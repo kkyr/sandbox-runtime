@@ -97,11 +97,20 @@ async function main(): Promise<void> {
       '-c <command>',
       'run command string directly (like sh -c), no escaping applied',
     )
+    .option(
+      '-t, --tty',
+      'enable TTY/PTY passthrough for interactive terminal applications (macOS only)',
+    )
     .allowUnknownOption()
     .action(
       async (
         commandArgs: string[],
-        options: { debug?: boolean; settings?: string; c?: string },
+        options: {
+          debug?: boolean
+          settings?: string
+          c?: string
+          tty?: boolean
+        },
       ) => {
         try {
           // Enable debug logging if requested
@@ -149,8 +158,20 @@ async function main(): Promise<void> {
             ),
           )
 
+          // Merge CLI options with config file settings
+          // CLI --tty flag takes precedence over config file allowPty
+          const effectiveConfig: Partial<SandboxRuntimeConfig> = {}
+          if (options.tty) {
+            effectiveConfig.allowPty = true
+            logForDebugging('TTY/PTY passthrough enabled via --tty flag')
+          }
+
           // Wrap the command with sandbox restrictions
-          const sandboxedCommand = await SandboxManager.wrapWithSandbox(command)
+          const sandboxedCommand = await SandboxManager.wrapWithSandbox(
+            command,
+            undefined, // binShell - use default
+            effectiveConfig,
+          )
 
           // Execute the sandboxed command
           const child = spawn(sandboxedCommand, {
